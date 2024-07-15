@@ -24,7 +24,9 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Random;
 
 
 public class MyDrawingSurface extends SurfaceView {
@@ -72,10 +74,14 @@ public class MyDrawingSurface extends SurfaceView {
     MyDrawingThread myDrawingThread;
 
     ProgressDialog progressDialog;
+    int[] pixels;
+
+    Random random = new Random();
 
 
-    public MyDrawingSurface(Context context , Bitmap bitmap) {
-        this(context , null , bitmap);
+
+    public MyDrawingSurface(Context context , File file) {
+        this(context , null ,file);
 
         progressDialog = new ProgressDialog(getContext());
         progressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
@@ -86,11 +92,13 @@ public class MyDrawingSurface extends SurfaceView {
 
 
 
+
+
 //        holder = getHolder();
 //        holder.addCallback(this);
     }
 
-    public MyDrawingSurface(Context context, AttributeSet attrs , Bitmap bitmap) {
+    public MyDrawingSurface(Context context, AttributeSet attrs , File file) {
         super(context, attrs);
 
         pathPaint = new Paint();
@@ -110,11 +118,13 @@ public class MyDrawingSurface extends SurfaceView {
         transPAint.setStrokeWidth(30);
 
         holder = getHolder();
-        this.bitmap = bitmap;
+        this.bitmap  = reduceSize(file , Utils.getScreenWidth(getContext()) , 600);
         mScaleDetector = new ScaleGestureDetector(getContext() , new ScaleListener());
 
         myDrawingThread = new MyDrawingThread("DrawingThread");
         myDrawingThread.start();
+
+
 
         myDrawingThread.holder.addCallback(new SurfaceHolder.Callback() {
             @Override
@@ -125,18 +135,48 @@ public class MyDrawingSurface extends SurfaceView {
                     public void run() {
 
 
-                        myDrawingThread.mCanvas.drawBitmap(bitmap , myDrawingThread.matrix , null);
+                        myDrawingThread.mCanvas.drawBitmap(myDrawingThread.bitmap , myDrawingThread.matrix , null);
                         myDrawingThread.matrix.invert(inverseMatrix);
+                        pixels = new int[myDrawingThread.bitmap.getWidth() * myDrawingThread.bitmap.getHeight()];
 
                         Canvas canvas = holder.lockCanvas();
                         //Bitmap bitmap = BitmapFactory.decodeResource(getResources() , R.drawable.indiagate);
 
-                        canvas.drawBitmap(bitmap,myDrawingThread.matrix , null);
+                        canvas.drawBitmap(myDrawingThread.bitmap,myDrawingThread.matrix , null);
 
                         MyDrawingSurface.this.holder.unlockCanvasAndPost(canvas);
 
                     }
                 });
+            }
+
+            private Bitmap reduceSize(File bitmapFile , int width , int height) {
+
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+
+                Bitmap bitmap1 = BitmapFactory.decodeFile(bitmapFile.getPath() , options);
+
+                int halfWidth = 0;
+                int halfHeight = 0;
+                int inSampleSize=1;
+
+                if (options.outWidth>width || options.outHeight>height) {
+
+                    halfWidth = width/2;
+                    halfHeight = height/2;
+
+                    while ((halfWidth/inSampleSize>=width) && (halfHeight/inSampleSize>=height)) {
+
+                        inSampleSize*=2;
+                    }
+                }
+
+                options.inSampleSize = inSampleSize;
+                options.inJustDecodeBounds=  false;
+
+                Bitmap bmp = BitmapFactory.decodeFile(bitmapFile.getPath() , options);
+                return bmp;
             }
 
 
@@ -147,13 +187,94 @@ public class MyDrawingSurface extends SurfaceView {
 
                // Log.d(TAG, "surfaceChanged: " + width + " " + height);
 
+
+
             }
 
             @Override
             public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
 
+                myDrawingThread.handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        myDrawingThread.mCanvas.drawBitmap(myDrawingThread.bitmap , myDrawingThread.matrix , null);
+                        myDrawingThread.matrix.invert(inverseMatrix);
+
+//                        Canvas c =  holder.lockCanvas();
+//                        c.drawBitmap(myDrawingThread.bitmap , myDrawingThread.matrix , null);
+//                        myDrawingThread.holder.unlockCanvasAndPost(c);
+
+                    }
+                });
+
             }
         });
+    }
+
+    private Bitmap reduceSize(File bitmapFile , int width , int height) {
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+
+        Bitmap bitmap1 = BitmapFactory.decodeFile(bitmapFile.getPath() , options);
+
+        int halfWidth = 0;
+        int halfHeight = 0;
+        int inSampleSize=1;
+
+        if (options.outWidth>width || options.outHeight>height) {
+
+            halfWidth = width/2;
+            halfHeight = height/2;
+
+            while ((halfWidth/inSampleSize>=width) || (halfHeight/inSampleSize>=height)) {
+
+                inSampleSize*=2;
+            }
+        }
+
+        options.inSampleSize = inSampleSize;
+        options.inJustDecodeBounds=  false;
+
+        Bitmap bmp = BitmapFactory.decodeFile(bitmapFile.getPath() , options);
+        Rect srcRect = new Rect(0 , 0 , bmp.getWidth() , bmp.getHeight());
+        Rect destREct = new Rect(0 , 0 , Utils.getScreenWidth(getContext()) , 600);
+        int total = destREct.width() + destREct.height();
+        float srcAspect = srcRect.width()/srcRect.height();
+
+        try {
+
+            if (srcRect.width()>destREct.width()) {
+
+                destREct = new Rect(0 , 0 , destREct.width() , (int)(destREct.height()*srcAspect));
+
+            } else if (srcRect.height()>destREct.width()) {
+
+                destREct = new Rect(0 , 0 , (int)(destREct.width()*srcAspect) , destREct.height());
+
+            } else {
+
+                destREct = new Rect(0 , 0 , (int)(destREct.width()) , destREct.height());
+
+
+            }
+
+        } catch (Exception ex) {
+
+
+
+
+        }
+
+
+        Bitmap bmp1 = Bitmap.createScaledBitmap(bmp , Utils.getScreenWidth(getContext()) , 600 , false);
+
+        Bitmap back = Bitmap.createBitmap(destREct.width() , destREct.height() , Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(back);
+        cv.drawBitmap(bmp , srcRect , destREct , null);
+        return back;
+
     }
 
 
@@ -302,18 +423,149 @@ public class MyDrawingSurface extends SurfaceView {
                             @Override
                             public void run() {
 
-                                new Handler(Looper.getMainLooper()).post(new Runnable() {
-                                    @Override
-                                    public void run() {
-
-                                        progressDialog.show();
-
-                                    }
-                                });
-
-
                                 int px = (int) event.getX();
                                 int py = (int) event.getY();
+
+                                if (px >= 0 && px < myDrawingThread.bitmap.getWidth() && py >= 0 && py < myDrawingThread.bitmap.getHeight()) {
+
+                                    int tPixel = myDrawingThread.bitmap.getPixel(px , py);
+//                                    int targetGray = (int) (Color.red(tPixel) * 0.3
+//                                            + Color.green(tPixel) * 0.59
+//                                            + Color.blue(tPixel) * 0.11);
+
+                                    myDrawingThread.bitmap.getPixels(pixels, 0, myDrawingThread.bitmap.getWidth(), 0, 0, myDrawingThread.bitmap.getWidth(), myDrawingThread.bitmap.getHeight());
+
+                                    for (int i = 0 ; i<myDrawingThread.bitmap.getWidth() ; i++) {
+
+                                        for (int j = 0; j < myDrawingThread.bitmap.getHeight();j++) {
+
+
+                                            int x = i;
+                                            int y = j;
+
+
+
+
+//                                            int Cpixel = myDrawingThread.bitmap.getPixel(x, y);
+//
+//                                            int currentGray = (int) (Color.red(Cpixel) * 0.3
+//                                                    + Color.green(Cpixel) * 0.59
+//                                                    + Color.blue(Cpixel) * 0.11);
+
+
+
+                                                int Cpixel = myDrawingThread.bitmap.getPixel(x, y);
+
+                                                int currentGray = (int) (Color.red(Cpixel) * 0.3
+                                                        + Color.green(Cpixel) * 0.59
+                                                        + Color.blue(Cpixel) * 0.11);
+
+                                                //int thres = random.nextInt(200);
+
+                                            //Log.d(TAG, "run: " + thres);
+
+                                            if (Cpixel == tPixel) {
+                                                if (currentGray>100) {
+
+                                                    myDrawingThread.bitmap.setPixel(x , y , Color.WHITE);
+
+
+                                                }
+
+
+                                            }
+
+
+
+
+
+
+
+
+
+                                           // }
+
+
+
+
+
+                                        }
+                                        //break;
+
+                                    }
+
+                                    myDrawingThread.mCanvas.drawBitmap(myDrawingThread.bitmap , myDrawingThread.matrix , null);
+                                    myDrawingThread.matrix.invert(inverseMatrix);
+
+
+
+                                    // Get the target grayscale value
+//                                    int targetColor = myDrawingThread.bitmap.getPixel(px, py);
+//
+//                                    int targetGray = (int) (Color.red(targetColor) * 0.3 + Color.green(targetColor) * 0.59 + Color.blue(targetColor) * 0.11);
+//
+//                                    // Get the bitmap dimensions
+//                                    int width = myDrawingThread.bitmap.getWidth();
+//                                    int height = myDrawingThread.bitmap.getHeight();
+//
+//                                    int currentColor = px;
+//                                    int red = Color.red(px);
+//                                    int green = Color.green(px);
+//                                    int blue = Color.blue(px);
+//
+//                                    int Ccolor = Color.rgb(red , green , blue);
+//
+//                                    // Buffer to hold all pixels at once
+////                                    int[] pixels = new int[width * height];
+//                                    myDrawingThread.bitmap.getPixels();
+//
+//                                    // Iterate through all pixels
+//                                    for (int i = 0; i < pixels.length; i++) {
+//                                        int x = i % width;
+//                                        int y = i / width;
+//
+//                                        int pColor = pixels[i];
+//                                        int pred = Color.red(pixels[i]);
+//                                        int pgreen = Color.green(pixels[i]);
+//                                        int pblue = Color.blue(pixels[i]);
+//
+//                                        int pcolor = Color.rgb(pred , pgreen , pblue);
+//
+//                                        if (pcolor == Ccolor) {
+//
+//
+////                                            if (currentGray>200) {
+//
+//                                                pixels[i] = Color.WHITE;
+//                                                //break;
+//
+//                                            //}
+//
+//
+//                                        }
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//                                        // Compare grayscale values and update pixel if conditions met
+//
+//
+//
+//
+//                                    }
+
+                                    //myDrawingThread.bitmap.setPixels(pixels , 0,  myDrawingThread.bitmap.getWidth() , 0 , 0,myDrawingThread.bitmap.getWidth() , myDrawingThread.bitmap.getHeight());
+                                }
+
 
                                 if (px>=0 && px<=myDrawingThread.bitmap.getWidth() && py>0 && py<=myDrawingThread.bitmap.getHeight()) {
 
@@ -345,9 +597,12 @@ public class MyDrawingSurface extends SurfaceView {
 
 //                                            if (targetColor == currentColor) {
 
-                                            if (currentGray > 90) {
-                                                // Erase or set to white (Color.WHITE) or any erase color
-                                                myDrawingThread.bitmap.setPixel(x, y, Color.WHITE);
+                                            if (targetGray == currentGray) {
+
+                                                if (currentGray>10) {
+                                                    // Erase or set to white (Color.WHITE) or any erase color
+                                                    myDrawingThread.bitmap.setPixel(x, y, Color.WHITE);
+                                                }
                                                 // }
 
 
@@ -364,6 +619,8 @@ public class MyDrawingSurface extends SurfaceView {
 
                                     }
                                 }
+
+
 
 
                                 Canvas c = myDrawingThread.holder.lockCanvas();

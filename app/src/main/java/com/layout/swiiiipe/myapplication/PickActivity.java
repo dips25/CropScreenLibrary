@@ -3,14 +3,12 @@ package com.layout.swiiiipe.myapplication;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Log;
-import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -23,7 +21,6 @@ import androidx.core.content.FileProvider;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,9 +28,10 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import static android.Manifest.*;
 
-public class MainActivity extends AppCompatActivity {
+public class PickActivity extends AppCompatActivity {
     private static final int GALLERY_CODE =200 ;
     ActivityResultLauncher launcher;
+    File photoFile;
 
     Button camera , gallery;
     ActivityResultLauncher<PickVisualMediaRequest> pickMedia;
@@ -97,13 +95,13 @@ public class MainActivity extends AppCompatActivity {
 
                             baos.writeTo(fos);
 
-                            Intent intent = new Intent(this , MainActivity2.class);
+                            Intent intent = new Intent(this , CropActivity.class);
                             intent.putExtra("data" , file2.getPath());
                             startActivity(intent);
 
                         } catch (Exception ex) {
 
-                            Log.d(MainActivity.class.getName(), "onActivityResult: " + ex.getMessage());
+                            Log.d(PickActivity.class.getName(), "onActivityResult: " + ex.getMessage());
 
 
                         }
@@ -150,7 +148,11 @@ public class MainActivity extends AppCompatActivity {
         Bitmap bitmap = null;
         Uri uri=null;
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-            uri = data.getData();
+            //uri = data.getData();
+
+            Intent intent = new Intent(this , CropActivity.class);
+            intent.putExtra("data" , photoFile.getPath());
+            startActivity(intent);
             //imageView.setImageBitmap(imageBitmap);
         } else if (requestCode == GALLERY_CODE && resultCode == RESULT_OK) {
 
@@ -184,13 +186,13 @@ public class MainActivity extends AppCompatActivity {
 
             }
 
-            Intent intent = new Intent(this , MainActivity2.class);
+            Intent intent = new Intent(this , CropActivity.class);
             intent.putExtra("data" , baos.toByteArray());
             startActivity(intent);
 
         } catch (Exception ex) {
 
-            Log.d(MainActivity.class.getName(), "onActivityResult: " + ex.getMessage());
+            Log.d(PickActivity.class.getName(), "onActivityResult: " + ex.getMessage());
 
 
         }
@@ -221,7 +223,7 @@ public class MainActivity extends AppCompatActivity {
         // Ensure that there's a camera activity to handle the intent
 
             // Create the File where the photo should go
-            File photoFile = null;
+            photoFile = null;
             try {
                 photoFile = createImageFile();
             } catch (IOException ex) {
